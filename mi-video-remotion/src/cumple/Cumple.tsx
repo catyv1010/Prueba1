@@ -16,15 +16,15 @@ import { slide } from "@remotion/transitions/slide";
 import { loadFont } from "@remotion/fonts";
 
 // Fuentes locales (public/fonts) para que el render no dependa de internet
-const serif = "Playfair Display";
-const script = "Great Vibes";
-const sans = "Montserrat";
+export const serif = "Playfair Display";
+export const script = "Great Vibes";
+export const sans = "Montserrat";
 loadFont({ family: serif, url: staticFile("fonts/playfair-italic.woff2"), style: "italic", weight: "500" });
 loadFont({ family: script, url: staticFile("fonts/greatvibes.woff2") });
 loadFont({ family: sans, url: staticFile("fonts/montserrat.woff2"), weight: "500" });
 
 const NOMBRE = "Luis Fernando";
-const GOLD = "#f3d27a";
+export const GOLD = "#f3d27a";
 const GOLD_GRADIENT = "linear-gradient(180deg, #fff4cf 0%, #f3d27a 45%, #c8932f 100%)";
 
 type Foto = {
@@ -50,7 +50,7 @@ export const OUTRO = 195;
 export const TRANS = 18;
 export const DURACION = INTRO + FOTOS.length * FOTO + OUTRO - (FOTOS.length + 1) * TRANS;
 
-const goldText: React.CSSProperties = {
+export const goldText: React.CSSProperties = {
   backgroundImage: GOLD_GRADIENT,
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
