@@ -7,3 +7,5 @@ node_modules/
 ejemplos/media/
 mi-video-remotion/out/
 __pycache__/
+# Fotos personales y audio generado del video de cumpleaños
+mi-video-remotion/public/luis/
