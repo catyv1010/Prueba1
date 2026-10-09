@@ -1,0 +1,9 @@
+# Repos de referencia clonados (muy pesados, se descargan con setup)
+repos/
+# Entornos y dependencias
+.venv/
+node_modules/
+# Salidas de render
+ejemplos/media/
+mi-video-remotion/out/
+__pycache__/
