@@ -10,3 +10,6 @@ __pycache__/
 # Fotos personales y audio generado del video de cumpleaños
 mi-video-remotion/public/luis/
 mi-video-remotion/public/luis2/
+# Modelos de IA (pesados, se descargan con el README) y fotos procesadas
+modelos/
+mi-video-remotion/public/luis3/
