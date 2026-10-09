@@ -18,13 +18,14 @@ import { serif, script, sans, goldText, GOLD } from "./Cumple";
  * (canción recortada: empieza en la primera palabra y termina con el cierre de piano).
  * - La batería entra en DROP (22.87 s); el tempo es 143.5 BPM (BEAT = 0.418 s).
  * - Las fotos de la estrofa duran 9 tiempos; las del coro, 12 tiempos.
- * - El cierre de piano empieza en FINAL (65 s).
+ * - Coro: 7 fotos, mosaico (24 tiempos), "Un gran esposo" y mensaje final.
+ * - El cierre de piano empieza en FINAL (78 s).
  */
 const FPS = 30;
 const BEAT = 0.418;
 const DROP = 22.87;
-const FINAL = 65.0;
-const FIN = 76.18;
+const FINAL = 78.0;
+const FIN = 89.18;
 export const DURACION_SUPER = Math.round(FIN * FPS);
 const f = (s: number) => Math.round(s * FPS);
 
@@ -61,12 +62,23 @@ const CORO: Foto[] = [
   { src: "13-esposos.jpg", aspect: 1156 / 867, origin: "55% 45%", pos: "45% 50%", kicker: "Su mayor orgullo", titulo: "Un gran esposo", sub: "con amor de sobra", heroe: true, entrada: "destello" },
 ];
 
-// Calcula inicio/fin (en segundos) de cada escena alineado al pulso de la canción
-const ESCENAS = [
-  ...ESTROFA.map((foto, i) => ({ foto, ini: DROP - (ESTROFA.length - i) * 9 * BEAT })),
-  ...CORO.map((foto, i) => ({ foto, ini: DROP + i * 12 * BEAT })),
-].map((e, i, arr) => ({ ...e, fin: i < arr.length - 1 ? arr[i + 1].ini : FINAL }));
-const INTRO_FIN = ESCENAS[0].ini;
+// Escenas con duración en tiempos de la canción; se encadenan desde el inicio de la estrofa
+type Escena = { tipo: "foto"; foto: Foto; tiempos: number } | { tipo: "mosaico" | "mensaje"; tiempos: number };
+const ESPOSOS = CORO[CORO.length - 1];
+const LISTA: Escena[] = [
+  ...ESTROFA.map((foto) => ({ tipo: "foto" as const, foto, tiempos: 9 })),
+  ...CORO.slice(0, -1).map((foto) => ({ tipo: "foto" as const, foto, tiempos: 12 })),
+  { tipo: "mosaico", tiempos: 24 },
+  { tipo: "foto", foto: ESPOSOS, tiempos: 12 },
+  { tipo: "mensaje", tiempos: 12 },
+];
+const INTRO_FIN = DROP - ESTROFA.length * 9 * BEAT;
+const ESCENAS = LISTA.map((e, i) => {
+  const ini = INTRO_FIN + LISTA.slice(0, i).reduce((a, x) => a + x.tiempos, 0) * BEAT;
+  const fin = i < LISTA.length - 1 ? ini + e.tiempos * BEAT : FINAL;
+  return { ...e, ini, fin };
+});
+const INICIO_ESPOSOS = ESCENAS.find((e) => e.tipo === "foto" && e.foto === ESPOSOS)!.ini;
 const TR = 12; // fotogramas de transición
 
 /* ---------- utilidades visuales ---------- */
@@ -389,6 +401,149 @@ const Final: React.FC = () => {
   );
 };
 
+/* ---------- mosaico: las fotos aparecen una por tiempo y la cámara entra en la de los esposos ---------- */
+const MOSAICO = [
+  "01-amigos-jovenes.jpg", "06-ingeniero.jpg", "03-bateria.jpg",
+  "02-familia.jpg", "13-esposos.jpg", "07-espejo.jpg",
+  "04-playa.jpg", "10-ceremonia.jpg", "08-amigos.jpg",
+  "09-antes-ahora.jpg", "11-palabras.jpg", "12-abuela.jpg",
+];
+const ORDEN_APARICION = [0, 5, 10, 3, 8, 1, 6, 11, 2, 9, 7, 4]; // la de los esposos aparece última
+const CENTRO = 4;
+
+const Mosaico: React.FC<{ inicioGlobal: number }> = ({ inicioGlobal }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const t = (frame - TR) / fps; // segundos desde el inicio real de la escena
+  const p = pulso(inicioGlobal + frame);
+  const entrada = interpolate(frame, [0, TR], [0, 1], clamp);
+  const zoomP = interpolate(t, [20 * BEAT, 24 * BEAT], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
+  const cw = 1080 / 3;
+  const ch = 1920 / 4;
+  const cx = cw * 1.5;
+  const cy = ch * 1.5;
+  const titulo = spring({ frame: frame - TR - f(12 * BEAT), fps, config: { damping: 200 } });
+  const tituloSale = interpolate(t, [18.5 * BEAT, 20 * BEAT], [1, 0], clamp);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#0b0814", opacity: entrada }}>
+      <AbsoluteFill
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: `translate(0px, ${(960 - cy) * zoomP}px) scale(${(1 + p * 0.012) * (1 + 2 * zoomP)})`,
+        }}
+      >
+        {MOSAICO.map((src, i) => {
+          const orden = ORDEN_APARICION.indexOf(i);
+          const s = spring({ frame: frame - TR - f(orden * BEAT), fps, config: { damping: 14, mass: 0.7 } });
+          const giro = (random(`g${i}`) - 0.5) * 16;
+          const col = i % 3;
+          const fila = Math.floor(i / 3);
+          const esCentro = i === CENTRO;
+          return (
+            <div
+              key={src}
+              style={{
+                position: "absolute",
+                left: col * cw + 6,
+                top: fila * ch + 6,
+                width: cw - 12,
+                height: ch - 12,
+                borderRadius: 14,
+                overflow: "hidden",
+                opacity: Math.min(1, s * 1.4),
+                transform: `scale(${0.4 + s * 0.6}) rotate(${giro * (1 - s)}deg)`,
+                boxShadow: esCentro ? `0 0 ${40 + p * 40}px rgba(243,210,122,0.7)` : "0 20px 40px rgba(0,0,0,0.5)",
+                outline: esCentro ? `3px solid ${GOLD}` : undefined,
+                filter: zoomP > 0 && !esCentro ? `brightness(${1 - zoomP * 0.7})` : undefined,
+              }}
+            >
+              <Img
+                src={staticFile(`luis2/${src}`)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${1.15 - s * 0.1})` }}
+              />
+            </div>
+          );
+        })}
+      </AbsoluteFill>
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          textAlign: "center",
+          opacity: titulo * tituloSale,
+          background: `radial-gradient(ellipse at center, rgba(7,6,13,${0.85 * titulo * tituloSale}) 0%, rgba(7,6,13,${0.5 * titulo * tituloSale}) 45%, rgba(7,6,13,0) 75%)`,
+        }}
+      >
+        <div style={{ fontFamily: serif, fontStyle: "italic", fontSize: 84, color: "white", transform: `translateY(${(1 - titulo) * 30}px)`, textShadow: "0 6px 30px rgba(0,0,0,0.8)" }}>
+          Una vida llena de
+        </div>
+        <div style={{ fontFamily: script, fontSize: 200, lineHeight: 1.2, transform: `scale(${0.8 + titulo * 0.2})`, ...goldText }}>
+          momentos
+        </div>
+      </AbsoluteFill>
+      <LuzCalida fuerza={0.5 + p * 0.5} />
+      <Vineta />
+    </AbsoluteFill>
+  );
+};
+
+/* ---------- mensaje antes del cierre ---------- */
+const Mensaje: React.FC<{ dur: number }> = ({ dur }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const entrada = interpolate(frame, [0, TR], [0, 1], clamp);
+  const k = spring({ frame: frame - TR, fps, config: { damping: 200 } });
+  const palabras = "Gracias por ser luz, fuerza y alegría para todos los que te rodean.".split(" ");
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#07060d", opacity: entrada }}>
+      <AbsoluteFill style={{ overflow: "hidden" }}>
+        <Img
+          src={staticFile("luis2/10-ceremonia.jpg")}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            filter: "blur(10px) brightness(0.35) saturate(1.2)",
+            transform: `scale(${interpolate(frame, [0, dur + TR], [1.1, 1.25])})`,
+          }}
+        />
+      </AbsoluteFill>
+      <LuzCalida fuerza={0.9} />
+      <Destellos n={50} velocidad={0.8} />
+      <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", textAlign: "center", padding: "0 80px" }}>
+        <div style={{ fontFamily: sans, fontSize: 30, letterSpacing: 4 + k * 12, color: GOLD, textTransform: "uppercase", opacity: k, marginBottom: 40 }}>
+          Para ti
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0 22px" }}>
+          {palabras.map((w, i) => {
+            const s = spring({ frame: frame - TR - 8 - i * 4, fps, config: { damping: 200 } });
+            return (
+              <span
+                key={i}
+                style={{
+                  fontFamily: serif,
+                  fontStyle: "italic",
+                  fontSize: 82,
+                  lineHeight: 1.3,
+                  color: "white",
+                  opacity: s,
+                  filter: `blur(${(1 - s) * 8}px)`,
+                  transform: `translateY(${(1 - s) * 25}px)`,
+                  textShadow: "0 6px 30px rgba(0,0,0,0.7)",
+                }}
+              >
+                {w}
+              </span>
+            );
+          })}
+        </div>
+      </AbsoluteFill>
+      <Vineta />
+    </AbsoluteFill>
+  );
+};
+
 /* ---------- destello blanco al entrar la batería ---------- */
 const FlashDrop: React.FC = () => {
   const frame = useCurrentFrame();
@@ -402,19 +557,21 @@ export const SuperCumple: React.FC = () => {
       <Sequence durationInFrames={f(INTRO_FIN) + TR}>
         <Intro />
       </Sequence>
-      {ESCENAS.map(({ foto, ini, fin }, i) => {
-        const desde = f(ini) - TR;
-        const dur = f(fin) - f(ini);
+      {ESCENAS.map((e, i) => {
+        const desde = f(e.ini) - TR;
+        const dur = f(e.fin) - f(e.ini);
         return (
-          <Sequence key={foto.src} from={desde} durationInFrames={dur + TR + (i === ESCENAS.length - 1 ? 24 : TR)}>
-            <EscenaFoto foto={foto} dur={dur} inicioGlobal={desde} primera={false} />
+          <Sequence key={i} from={desde} durationInFrames={dur + TR + (i === ESCENAS.length - 1 ? 24 : TR)}>
+            {e.tipo === "foto" && <EscenaFoto foto={e.foto} dur={dur} inicioGlobal={desde} primera={false} />}
+            {e.tipo === "mosaico" && <Mosaico inicioGlobal={desde} />}
+            {e.tipo === "mensaje" && <Mensaje dur={dur} />}
           </Sequence>
         );
       })}
       <Sequence from={f(DROP) - 2} durationInFrames={20}>
         <FlashDrop />
       </Sequence>
-      <Sequence from={f(CORO.length ? ESCENAS[ESCENAS.length - 1].ini : 0) - 2} durationInFrames={20}>
+      <Sequence from={f(INICIO_ESPOSOS) - 2} durationInFrames={20}>
         <FlashDrop />
       </Sequence>
       <Sequence from={f(FINAL)} durationInFrames={DURACION_SUPER - f(FINAL)}>
